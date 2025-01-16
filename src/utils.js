@@ -167,6 +167,12 @@ export const getClipboardText = () => new Promise((resolve, reject) => {
 export const addClipboardToast = overlay =>
     overlay.add_toast(new Adw.Toast({ title: _('Copied to clipboard'), timeout: 1 }))
 
+export const reloadToast = overlay =>
+    overlay.add_toast(new Adw.Toast({ title: _('Book reloaded'), timeout: 1 }))
+
+export const deletedToast = overlay =>
+    overlay.add_toast(new Adw.Toast({ title: _('Book deleted'), timeout: 1 }))
+
 export const base64ToPixbuf = base64 => {
     if (!base64) return null
     try {

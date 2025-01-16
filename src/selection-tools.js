@@ -71,7 +71,7 @@ const tools = {
                 lang: popover.translate_target_language || defaultLang,
             }
         },
-    },
+    }   ,
 }
 
 const SelectionToolPopover = GObject.registerClass({

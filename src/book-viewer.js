@@ -230,18 +230,23 @@ GObject.registerClass({
         let isDiscrete = true, dxLast, dyLast
         const scrollPageAsync = utils.debounce((dx, dy) => {
             if (Math.abs(dx) > Math.abs(dy)) {
-                if (dx > 0) return this.goRight()
-                else if (dx < 0) return this.goLeft()
+                if (dx > 0) return this.nextSection()
+                else if (dx < 0) return this.prevSection()
             } else {
                 if (dy > 0) return this.next()
                 else if (dy < 0) return this.prev()
             }
         }, 100, true)
-        this.#webView.add_controller(utils.connect(new Gtk.EventControllerScroll({
-            flags: Gtk.EventControllerScrollFlags.BOTH_AXES,
-        }), {
+        this.scrollController = new Gtk.EventControllerScroll({
+                flags: Gtk.EventControllerScrollFlags.BOTH_AXES,
+            })          
+        this.#webView.add_controller(utils.connect(this.scrollController, {
             'scroll-begin': () => isDiscrete = false,
             'scroll': (_, dx, dy) => {
+                if(this.scrollController.get_current_event().get_modifier_state() == Gdk.ModifierType.CONTROL_MASK  & Math.abs(dy)>0) {
+                    if (dy >0) this.zoomOut() 
+                    else this.zoomIn()
+                } else { 
                 if (this.#pinchFactor > 1
                 || this.viewSettings.scrolled
                 || this.#dialogOpened) return false
@@ -252,7 +257,8 @@ GObject.registerClass({
                     this.#exec('reader.scrollBy', [dx, dy])
                 }
                 return true
-            },
+            }
+        },
             'scroll-end': () => {
                 if (dxLast != null) this.#exec('reader.snap', [dxLast, dyLast])
                 isDiscrete = false
@@ -274,7 +280,7 @@ GObject.registerClass({
 
         this.actionGroup = utils.addMethods(this, {
             actions: [
-                'reload', 'inspector', 'prev', 'next', 'go-left', 'go-right',
+                'reload', 'edit', 'inspector', 'prev', 'next', 'go-left', 'go-right',
                 'scroll-up', 'scroll-down',
                 'prev-section', 'next-section', 'first-section', 'last-section',
                 'back', 'forward', 'zoom-in', 'zoom-restore', 'zoom-out', 'print',
@@ -332,10 +338,56 @@ GObject.registerClass({
         this.#bookReady = false
         if (file) this.#path = file.get_path()
         this.#webView.loadURI('foliate:///reader/reader.html')
-            .catch(e => console.error(e))
+            .catch(e => console.error(e))        
+        try {
+            if(typeof this.monitor === "undefined" && file) 
+            {                    
+                this.monitor = file.monitor(Gio.FileMonitorFlags.NONE, null);
+                console.log(`Monitoring opened book file: ${file.get_path()}`)
+                this.monitoredFilePath = file.get_path() 
+                this.monitor.connect('changed', (monitor, file, otherFile, eventType) => {
+                    switch (eventType) {
+                        case Gio.FileMonitorEvent.CREATED:
+                            console.log(`Book file created: ${file.get_path()}`);
+                            this.reload()
+                            break;  
+                        case Gio.FileMonitorEvent.DELETED:
+                            if  (this.monitoredFilePath === file.get_path()) 
+                            { 
+                                console.log(`Book file deleted: ${file.get_path()}`);
+                                utils.deletedToast(this.root)
+                            }
+                            break;
+                        case Gio.FileMonitorEvent.CHANGED:
+                            console.log(`File changed: ${file.get_path()}`);
+                            this.reload()
+                            break;
+                        case Gio.FileMonitorEvent.MOVED:
+                            console.log(`File moved: ${file.get_path()} to ${otherFile.get_path()}`);
+                            break;
+                        default:
+                                console.log(`Other event: ${eventType} of the monitored file: ${file.get_path()}`);
+                        }
+                    });
+                }
+            } 
+            catch (e) {
+                console.log(`Error while monitoring opened file: ${e.message}`);
+            }    
+    }
+    edit(file) {
+        try {
+            // const proc = Gio.Subprocess.new(['gtk-launch', 'sigil', this.#path], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+            const proc = Gio.Subprocess.new(['', 'calibre-ebook-edit', this.#path], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+        
+        }   
+        catch (e) {
+            console.log(e);
+        }
     }
     reload() {
         this.open()
+        utils.reloadToast(this.root)
     }
     zoomIn() { this.#webView.zoom_level += 0.1 }
     zoomOut() { this.#webView.zoom_level -= 0.1 }
@@ -560,12 +612,22 @@ export const BookViewer = GObject.registerClass({
         this._bookmark_button.connect('clicked', autohideHeaderbar.hide)
         this._navbar.connect('closed', autohideNavbar.hide)
         this._navbar.connect('opened', autohideNavbar.show)
-        this._view.webView.add_controller(utils.connect(new Gtk.GestureClick(), {
-            'pressed': () => {
-                autohideHeaderbar.hide()
-                autohideNavbar.hide()
-            },
-        }))
+        const mouseButtonController = new Gtk.GestureClick()
+        mouseButtonController.set_button(0);
+        mouseButtonController.set_propagation_phase(Gtk.PropagationPhase.BUBBLE)
+        this._view.webView.add_controller(mouseButtonController)
+        mouseButtonController.connect('pressed', (actor, n_press, x, y) => {
+            switch (actor.get_current_button()){
+                case 8: 
+                    this._view.back()
+                    break;
+                case 9:
+                    this._view.forward()
+                    break;
+            }
+            autohideHeaderbar.hide()
+            autohideNavbar.hide()
+        });
 
         // search
         this._search_view.getGenerator = params => this._view.search(params)
@@ -693,6 +755,8 @@ export const BookViewer = GObject.registerClass({
             'F12': 'view.inspector',
             '<ctrl>m': 'view.scrolled',
             '<ctrl>r': 'view.reload',
+            '<ctrl>e': 'view.edit',
+            '<ctrl>b': 'win.new-window',
             'plus|equal|KP_Add|KP_Equal|<ctrl>plus|<ctrl>equal|<ctrl>KP_Add|<ctrl>KP_Equal': 'view.zoom-in',
             'minus|KP_Subtract|<ctrl>minus|<ctrl>KP_Subtract': 'view.zoom-out',
             '0|1|KP_0|<ctrl>0|<ctrl>KP_0': 'view.zoom-restore',
@@ -772,7 +836,7 @@ export const BookViewer = GObject.registerClass({
             const updateAnnotations = () => this._annotation_stack
                 .visible_child_name = annotations.n_items > 0 ? 'main' : 'empty'
             const updateBookmarks = () => {
-                this._bookmark_view.update()
+                    this._bookmark_view.update()
                 this._bookmark_stack.visible_child_name =
                     bookmarks.n_items > 0 ? 'main' : 'empty'
             }
@@ -823,6 +887,7 @@ export const BookViewer = GObject.registerClass({
             const popover = new SelectionPopover()
             popover.insert_action_group('selection', utils.addSimpleActions({
                 'copy': () => resolve('copy'),
+                'google': () => resolve('google'),
                 'copy-cfi': () => utils.setClipboardText(value, this.root),
                 'copy-citation': () => resolve('copy-citation'),
                 'highlight': () => {
@@ -868,6 +933,14 @@ export const BookViewer = GObject.registerClass({
                 Gdk.ContentProvider.new_for_value(text)]))
             utils.addClipboardToast(this.root)
         }
+        else if (action === 'google') {
+            try {
+                    const proc = Gio.Subprocess.new(['xdg-open', 'https://www.google.com/search?q='+encodeURIComponent(text)], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+                } 
+            catch (e)   {
+                console.log(e);
+            }
+        }       
         else if (action === 'copy-citation') {
             const page = payload.pageItem?.label
             const title = this._book_title.label

@@ -142,6 +142,7 @@ const ApplicationWindow = GObject.registerClass({
                 'application/x-fictionbook+xml',
                 'application/x-zip-compressed-fb2',
                 'application/vnd.comicbook+zip',
+                'application/pdf',
             ],
         })
         dialog.filters = new Gio.ListStore()

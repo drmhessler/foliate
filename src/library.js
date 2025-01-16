@@ -46,6 +46,8 @@ const defaultCatalogs = [
 const uiText = {
     loading: _('Loading'),
     error: _('Failed to Load'),
+    edit: _('Edit'),
+    openFolder :_('Open Folder'),
     reload: _('Reload'),
     cancel: _('Cancel'),
     viewCollection: _('See All'),
@@ -77,6 +79,29 @@ const uiText = {
         language: _('Language'),
         identifier: _('Identifier'),
     },
+}
+
+
+function getDocumentType(filePath) {
+    const file = Gio.File.new_for_path(filePath);
+    let info;
+    try {
+    info = file.query_info('standard::content-type', Gio.FileQueryInfoFlags.NONE, null);    
+    }
+    catch (e) {
+        console.error('Failed to query file info:', e);
+        return 'unknown';
+    }
+    
+    const mimeType = info.get_content_type();
+
+    if (mimeType === 'application/pdf') {
+        return 'pdf';
+    } else if (mimeType === 'application/epub+zip') {
+        return 'epub';
+    } else {
+        return 'unknown';
+    }
 }
 
 const getURIFromTracker = identifier => {
@@ -179,6 +204,49 @@ const BookList = GObject.registerClass({
         for (const f of [file, cover]) try { f.delete(null) } catch {}
         for (const [i, el] of utils.gliter(this)) if (el === file) this.remove(i)
     }
+    async edit(file) {
+        const { identifier } = this.readFile(file)?.metadata ?? {}
+        const uri = this.#uriStore.get(identifier)
+        const filePath =  uri.startsWith('~') ? uri.replace('~', GLib.get_home_dir()) :  uri
+        console.log(identifier)
+        try {
+            const documentType = getDocumentType(filePath);
+            let proc
+            // const proc = Gio.Subprocess.new(['gtk-launch', 'sigil', uri.startsWith('~') ? uri.replace('~', GLib.get_home_dir()) :  uri], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+            switch(documentType) 
+            {
+                case "epub":
+                    console.log("Editing epub file")
+                    proc = Gio.Subprocess.new(['gtk-launch', 'calibre-ebook-edit', filePath], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+                    break;
+                case "pdf":    
+                    // proc = Gio.Subprocess.new(['gtk-launch', 'calibre-ebook-edit', uri.startsWith('~') ? uri.replace('~', GLib.get_home_dir()) :  uri], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+                    console.log("Editing pdf file")
+                    proc = Gio.Subprocess.new(['gtk-launch', 'masterpdfeditor5', filePath], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+                    break;
+                default:
+                    console.log('Unsupported document type');
+                    return;
+            }
+            
+        } 
+        catch (e)   {
+            console.log(e);
+                }
+    }
+    openFolder (file)
+    {   console.log("openFolder")
+        const { identifier } = this.readFile(file)?.metadata ?? {}
+        const uri = this.#uriStore.get(identifier)      
+        var n = uri.lastIndexOf('/')
+        var folder = uri.substring(0,n);
+        try {
+            const proc = Gio.Subprocess.new(['xdg-open', '"'+folder.startsWith('~') ? folder.replace('~', GLib.get_home_dir()) :  folder+'"'], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+        } 
+        catch (e)   {
+            console.log(e);
+                }
+    }   
     update(path) {
         // remove it from the queue if it's not yet loaded
         const i = this.#files.findIndex(f => f?.get_path() === path)
@@ -228,6 +296,8 @@ const BookItem = GObject.registerClass({
     Signals: {
         'open-new-window': { param_types: [Gio.File.$gtype] },
         'remove-book': { param_types: [Gio.File.$gtype] },
+        'open-folder':  {param_types: [Gio.File.$gtype] },
+        'edit-book': { param_types: [Gio.File.$gtype] },
         'export-book': { param_types: [Gio.File.$gtype] },
         'book-info': { param_types: [Gio.File.$gtype] },
         'open-external-app': { param_types: [Gio.File.$gtype] },
@@ -238,6 +308,8 @@ const BookItem = GObject.registerClass({
         super(params)
         this.insert_action_group('book-item', utils.addSimpleActions({
             'open-new-window': () => this.emit('open-new-window', this.#item),
+            'open-folder': () => this.emit('open-folder', this.#item),
+            'edit': () => this.emit('edit-book', this.#item),       
             'remove': () => this.emit('remove-book', this.#item),
             'export': () => this.emit('export-book', this.#item),
             'info': () => this.emit('book-info', this.#item),
@@ -259,6 +331,8 @@ const BookRow = GObject.registerClass({
     InternalChildren: ['title', 'author', 'progress-grid', 'progress-bar', 'progress-label'],
     Signals: {
         'open-new-window': { param_types: [Gio.File.$gtype] },
+        'open-folder':  {param_types: [Gio.File.$gtype] },
+        'edit-book': { param_types: [Gio.File.$gtype] },
         'remove-book': { param_types: [Gio.File.$gtype] },
         'export-book': { param_types: [Gio.File.$gtype] },
         'book-info': { param_types: [Gio.File.$gtype] },
@@ -270,6 +344,8 @@ const BookRow = GObject.registerClass({
         super(params)
         this.insert_action_group('book-item', utils.addSimpleActions({
             'open-new-window': () => this.emit('open-new-window', this.#item),
+            'open-folder': () => this.emit('open-folder', this.#item),
+            'edit': () => this.emit('edit-book', this.#item),
             'remove': () => this.emit('remove-book', this.#item),
             'export': () => this.emit('export-book', this.#item),
             'info': () => this.emit('book-info', this.#item),
@@ -327,6 +403,8 @@ GObject.registerClass({
         { 'items-changed': () => this.#update() })
     #itemConnections = {
         'open-new-window': (_, file) => this.root.addWindow(getBooks().getBook(file)),
+        'open-folder': (_, file) => this.openFolder(file),
+        'edit-book': (_, file) => this.editBook(file),
         'remove-book': (_, file) => this.removeBook(file),
         'export-book': (_, file) => {
             const data = getBooks().readFile(file)
@@ -431,6 +509,13 @@ GObject.registerClass({
             return fields.some(field => matchString(metadata[field], q))
         })
     }
+    editBook(file) {       
+        getBooks().edit(file)     
+    }
+    
+    openFolder(file) {
+            getBooks().openFolder(file)
+        }
     removeBook(file) {
         const dialog = new Adw.MessageDialog({
             transient_for: this.get_root(),
@@ -446,6 +531,9 @@ GObject.registerClass({
             if (response === 'remove') getBooks().delete(file)
         })
     }
+    getBookNumbers() {
+        return getBooks.getBookNumbers()
+    }       
     openWithExternalApp(file) {
         if (!file) return
         const path = file.get_path()
@@ -735,11 +823,26 @@ const SidebarRow = GObject.registerClass({
 })
 
 const sidebarListModel = new Gio.ListStore()
-sidebarListModel.append(new SidebarItem({
-    icon: 'library-symbolic',
-    label: _('All Books'),
-    value: 'library',
-}))
+
+const sidebarListShowBookNumber  = (offset) => 
+    {   
+        let bookNumber = 0
+        let [ok, contents] = GLib.file_get_contents(pkg.datapath('library')+'/uri-store.json')
+        if (ok) {
+             let utf8decoder = new TextDecoder()
+            let map = JSON.parse(utf8decoder.decode(contents))
+            bookNumber = map.uris.length
+        }
+        if (sidebarListModel['n-items']>0) sidebarListModel.remove(0);
+                    sidebarListModel.append (new SidebarItem({
+                        icon: 'library-symbolic',
+                        label: _('All Books')+' ('+(bookNumber+offset).toString() +')',
+                        value: 'library',
+                        }))     
+    }
+    
+sidebarListShowBookNumber(0)
+
 sidebarListModel.append(new SidebarItem({
     type: 'action',
     icon: 'list-add-symbolic',

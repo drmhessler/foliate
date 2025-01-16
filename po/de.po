@@ -485,13 +485,11 @@ msgstr "Umbenennen"
 msgid "Name"
 msgstr "Name"
 
-#: src/library.js:740
-#, fuzzy
+#: src/library.js:797
 msgid "All Books"
 msgstr "Alle Bücher"
 
 #: src/library.js:746
-#, fuzzy
 msgid "Add Catalog…"
 msgstr "Katalog hinzufügen…"
 
@@ -636,6 +634,10 @@ msgstr ""
 msgid "Copied to clipboard"
 msgstr "In die Zwischenablage kopiert"
 
+#: src/utils.js:171
+msgid "Book reloaded"
+msgstr "Buch wiedergeladen"
+
 #: src/ui/annotation-popover.ui:13
 #, fuzzy
 msgid "Highlight Style"
@@ -662,19 +664,27 @@ msgstr "In neuem Fenster öffnen"
 
 #: src/ui/book-item.ui:9 src/ui/book-row.ui:9
 msgid "Open with External App"
-msgstr ""
+msgstr "Mit externer App öffnen"
 
 #: src/ui/book-item.ui:19 src/ui/book-row.ui:19 src/ui/book-viewer.ui:25
 msgid "Export Annotations…"
 msgstr "Anmerkungen exportieren…"
 
 #: src/ui/book-viewer.ui:5
-msgid "New Window"
-msgstr "Neues Fenster"
+msgid "New Book"
+msgstr "Neues Buch"
+
+#: src/library.js:49
+msgid "Edit"
+msgstr "Editieren"
 
 #: src/ui/book-viewer.ui:11
 msgid "Open a Copy"
 msgstr "Eine Kopie öffnen"
+
+# src/library.js:50
+msgid "Open Folder"
+msgstr "Verzeichnis öffnen"
 
 #: src/ui/book-viewer.ui:21
 msgid "Import Annotations…"
@@ -920,12 +930,10 @@ msgid "Import Anyway"
 msgstr "Trotzdem importieren"
 
 #: src/ui/library.ui:6
-#, fuzzy
 msgid "List View"
 msgstr "Listenansicht"
 
 #: src/ui/library.ui:11
-#, fuzzy
 msgid "Grid View"
 msgstr "Rasteransicht"
 

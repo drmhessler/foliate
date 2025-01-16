@@ -21,6 +21,14 @@
     </item>
   </section>
   <section>
+  <item>
+      <attribute name="label" translatable="yes">Open Folder</attribute>
+      <attribute name="action">book-item.open-folder</attribute>
+    </item>
+  <item>
+      <attribute name="label" translatable="yes">Edit</attribute>
+      <attribute name="action">book-item.edit</attribute>
+  </item>
     <item>
       <attribute name="label" translatable="yes">Remove</attribute>
       <attribute name="action">book-item.remove</attribute>

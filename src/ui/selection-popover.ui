@@ -9,6 +9,11 @@
       <attribute name="verb-icon">edit-copy-symbolic</attribute>
     </item>
     <item>
+      <attribute name="label" translatable="yes">Google</attribute>
+      <attribute name="action">selection.google</attribute>
+      <attribute name="verb-icon">applications-internet</attribute>
+    </item> 
+    <item>
       <attribute name="label" translatable="yes">Highlight</attribute>
       <attribute name="action">selection.highlight</attribute>
       <attribute name="verb-icon">document-edit-symbolic</attribute>

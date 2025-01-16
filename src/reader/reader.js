@@ -412,6 +412,9 @@ class Reader {
                 case 'copy': getHTML(range).then(html =>
                     emit({ type: 'selection', action, text, html }))
                     break
+                case 'google': getHTML(range).then(html =>
+                    emit({ type: 'selection', action, text, html }))
+                    break    
                 case 'copy-citation':
                     emit({ type: 'selection', action, text, value,
                         ...this.view.getProgressOf(index, range) })
